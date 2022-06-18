@@ -1,0 +1,26 @@
+image: maven:3.3.9-jdk-8
+
+variables:
+  DOCKER_DRIVER: overlay2
+  MAVEN_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+
+stages:
+  - deploy
+
+before_script:
+  - which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )
+  - eval $(ssh-agent -s)
+  - echo "$ARCHANGEL_SSH_PRIVATE_KEY" | ssh-add -
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - ssh-keyscan -p $ARCHANGEL_PORT $ARCHANGEL_HOST >> ~/.ssh/known_hosts
+  - chmod 644 ~/.ssh/known_hosts
+
+deploy:
+  stage: deploy
+  only:
+    - master
+  script:
+    - 'mvn package -T 1C -am -Dmaven.test.skip -s $CI_PROJECT_DIR/ci_settings.xml'
+    - 'scp -P $ARCHANGEL_PORT target/plazmix-bukkitauth.jar $ARCHANGEL_USER@$ARCHANGEL_HOST:~/cloud/templates/main/auth/plugins'
+
